@@ -27,7 +27,7 @@ const B = () => norm(cur().b);
 const T = () => D.data.alvo;
 const O = () => D.data.opc;
 const F = () => D.data.foco;
-const ui = { curva: 'crit', cmpA: null, cmpB: null };
+const ui = { metodo: 'print', curva: 'crit', cmpA: null, cmpB: null };
 let toastT;
 function toast(msg) {
   let t = $('.toast'); if (!t) { t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status'); document.body.append(t); }
@@ -87,8 +87,8 @@ function pInicio() {
   const capBar = (v, cap) => `<div class="bar" style="margin-top:6px"><i class="f-${v >= cap ? 'crit' : v >= cap * .9 ? 'warn' : 'good'}" style="width:${Math.min(100, v / cap * 100).toFixed(0)}%"></i></div>`;
   const novo = cur().exemplo || cur().rascunho;
   const comece = novo ? `<div class="card start"><h2>Comece pela sua build</h2>
-    <p class="sub">O que aparece abaixo ainda é a ficha de exemplo. Leva 1 minuto: mande um print da sua ficha e o app lê os números.</p>
-    <div class="row"><button class="btn main big" data-act="criar" data-m="print">📷 Criar com print da ficha</button><button class="btn big" data-act="criar" data-m="manual">✎ Digitar os números</button></div></div>` : '';
+    <p class="sub">O que aparece abaixo ainda é a ficha de exemplo. Escolha como quer passar os seus números:</p>
+    <div class="row"><button class="btn main big" data-act="criar" data-m="print">📷 Print da ficha</button><button class="btn big" data-act="criar" data-m="digitar">✎ Digitar os stats</button><button class="btn big" data-act="criar" data-m="json">{ } Colar JSON</button></div></div>` : '';
   return `<div class="banner"><img src="img/muu-chan.webp" alt="Muu-chan Builds"></div>
   ${comece}
   ${topo('Início', 'Onde sua build está e o que mexer primeiro.')}
@@ -239,14 +239,40 @@ function cmpHtml() {
 const CAMPOS = [['Ofensivo', [['dano_min', 'Dano Base mínimo'], ['dano_max', 'Dano Base máximo'], ['crit', 'Chance de acerto crítico (rating)'], ['crit_chefe', 'Crítico contra Chefes (aba Chefes)'], ['pesado', 'Chance de ataque pesado (rating)'], ['pesado_chefe', 'Pesado contra Chefes (aba Chefes)'], ['acerto', 'Chance de acerto (rating)'], ['dc', 'Dano Crítico (%)'], ['dap', 'Dano de Ataque Pesado (%)'], ['dap_extra', 'DAP extra de set (buff condicional, %)'], ['amp', 'Ampliação de Dano de Habilidade'], ['amp_magico', 'Ampliação de Dano Mágico (%)'], ['bonus', 'Bônus de Dano'], ['recarga', 'Velocidade de Recarga (%)'], ['vel_ataque', 'Velocidade de Ataque (%)']]],
   ['Cura', [['cura', 'Cura (%)'], ['cura_cont', 'Cura Contínua de Habilidade (%)'], ['cura_rec', 'Cura Recebida (%)'], ['esc_div', 'Eficácia de cura da maestria (%)']]],
   ['Defesa', [['def_corpo', 'Defesa corpo a corpo'], ['def_mag', 'Defesa mágica'], ['resist', 'Resistência a Dano de Habilidade'], ['reducao', 'Redução de Dano (%)'], ['vida', 'Vida máxima']]]];
+const camposHtml = b => CAMPOS.map(([g, cs]) => `<fieldset><legend>${g}</legend><div class="frm">${cs.map(([k, n]) => `<label class="field"><span>${n}</span><input type="number" step="any" value="${b[k]}" data-k="${k}"></label>`).join('')}</div></fieldset>`).join('');
+const printHtml = () => `<p class="sub">Mande prints da ficha (Efeitos Básicos, Ataque e Proteção, aba Chefes). O app lê os números e você confere antes de aplicar. Na primeira vez ele baixa o leitor, então precisa de internet.</p>
+  <label class="drop" id="drop" for="ocrfile"><input type="file" id="ocrfile" accept="image/*" multiple hidden><b>Escolher prints</b> ou arrastar aqui<small>Também dá para colar com Ctrl+V</small></label><div id="ocrout">${ocrHtml()}</div>`;
+
+/* Nova build: 3 metodos para preencher e um botao para confirmar */
+const METODOS = [['print', '📷', 'Print da ficha', 'O app lê os números da imagem.'], ['digitar', '✎', 'Digitar os stats', 'Preencha campo por campo.'], ['json', '{ }', 'Colar JSON', 'Se alguém já te mandou a ficha pronta.']];
+function cbTexto(c) {
+  const t = c.tocados || [], falta = ESSENCIAIS.filter(k => !t.includes(k));
+  return `<b>${t.length ? `${t.length} ${t.length === 1 ? 'campo preenchido' : 'campos preenchidos'}` : 'Nenhum campo preenchido ainda'}</b><small>${t.length && falta.length ? 'Faltam essenciais: ' + falta.map(k => NOMES[k] || k).slice(0, 3).join(', ') + (falta.length > 3 ? '…' : '') : t.length ? 'Pode confirmar ou ajustar mais.' : 'O que não for preenchido fica com o valor do exemplo.'}</small>`;
+}
+const marcar = (c, ks) => { c.tocados = [...new Set([...(c.tocados || []), ...ks])]; };
+function pNova() {
+  const c = cur(), b = B(), m = ui.metodo;
+  const painel = m === 'print' ? printHtml()
+    : m === 'digitar' ? `<p class="sub">Use os números da tela de status do jogo. Os campos que você não mexer ficam com o valor do exemplo.</p>${camposHtml(b)}`
+    : `<p class="sub">Cole o JSON da ficha (o Claude devolve nesse formato ao ler o print, ou use "Copiar ficha atual" em outra build).</p>
+      <textarea id="json" rows="7" spellcheck="false" placeholder='{"build": {"crit": 2726, "pesado": 1617.8, "dc": 22.1}}'></textarea>
+      <div class="row" style="margin-top:10px"><button class="btn main" data-act="jsonapply">Carregar JSON</button></div>`;
+  return `${topo('Nova build', 'Escolha UM jeito de preencher, confira e confirme no final.')}
+  <div class="card"><label class="field"><span>1. Nome da build</span><input type="text" id="nome" value="${esc(c.nome)}"></label></div>
+  <div class="card" style="margin-top:16px"><h2>2. Como você quer preencher?</h2>
+    <div class="metodos" role="tablist">${METODOS.map(([k, ic, t, s]) => `<button role="tab" class="metodo" aria-selected="${m === k}" data-act="metodo" data-k="${k}"><span class="mi" aria-hidden="true">${ic}</span><b>${t}</b><small>${s}</small></button>`).join('')}</div>
+    <div class="painel" style="margin-top:16px">${painel}</div></div>
+  <div class="confirmbar"><div class="cb-t">${cbTexto(c)}</div>
+    <div class="row"><button class="btn" data-act="cancelar">Cancelar</button><button class="btn main big" data-act="confirmar">✓ Criar build</button></div></div>`;
+}
 function pFicha() {
-  const b = B(), rasc = cur().rascunho;
+  if (cur().rascunho) return pNova();
+  const b = B();
   const nome = `<div class="card"><label class="field"><span>Nome da build</span><input type="text" id="nome" value="${esc(cur().nome)}"></label></div>`;
-  const campos = `<div class="card" style="margin-top:16px">${rasc ? '<p class="note z-warn" style="margin:0 0 10px">▲ Estes números ainda são do exemplo. Mande o print acima ou troque cada um pelo da sua ficha.</p>' : ''}${CAMPOS.map(([g, cs]) => `<fieldset><legend>${g}</legend><div class="frm">${cs.map(([k, n]) => `<label class="field"><span>${n}</span><input type="number" step="any" value="${b[k]}" data-k="${k}"></label>`).join('')}</div></fieldset>`).join('')}</div>`;
-  const print = `<div class="card${rasc ? ' start' : ''}" style="margin-top:16px"><h2>${rasc ? 'Passo 1: mande o print da sua ficha' : 'Ler de um print'}</h2><p class="sub">Mande prints da ficha (Efeitos Básicos, Ataque e Proteção, aba Chefes). O app lê os números e você confere antes de aplicar. Na primeira vez ele baixa o leitor, então precisa de internet.</p>
-    <label class="drop" id="drop" for="ocrfile"><input type="file" id="ocrfile" accept="image/*" multiple hidden><b>Escolher prints</b> ou arrastar aqui<small>Também dá para colar com Ctrl+V</small></label><div id="ocrout">${ocrHtml()}</div></div>`;
-  return `${topo('Ficha', rasc ? 'Nova build: mande o print ou digite os números. Salva sozinho.' : 'Os números da sua ficha de status. Salvam sozinhos.')}
-  ${nome}${rasc ? print + campos : campos + print}
+  const campos = `<div class="card" style="margin-top:16px">${camposHtml(b)}</div>`;
+  const print = `<div class="card" style="margin-top:16px"><h2>Ler de um print</h2>${printHtml()}</div>`;
+  return `${topo('Ficha', 'Os números da sua ficha de status. Salvam sozinhos.')}
+  ${nome}${campos}${print}
   <div class="card" style="margin-top:16px"><h2>Importar e exportar</h2><p class="sub">Cole o JSON que o Claude devolve ao ler o print da sua ficha, ou copie o seu para guardar.</p>
     <textarea id="json" rows="6" spellcheck="false" placeholder='{"build": {"crit": 2726, "pesado": 1617.8, "dc": 22.1}}'></textarea>
     <div class="row" style="margin-top:10px"><button class="btn main" data-act="jsonapply">Aplicar JSON</button><button class="btn" data-act="jsoncopy">Copiar ficha atual</button><button class="btn" data-act="exemplo">Voltar ao exemplo</button></div>
@@ -309,6 +335,7 @@ function ocrHtml() {
 }
 const ocrRender = () => { const el = $('#ocrout'); if (el) el.innerHTML = ocrHtml(); };
 async function ocrArquivos(files) {
+  if (cur().rascunho && ui.metodo !== 'print') { ui.metodo = 'print'; refresh(); }
   const o = ui.ocr; o.busy = true; o.erro = ''; o.status = 'Preparando o leitor…'; ocrRender();
   for (const f of files) {
     try {
@@ -334,7 +361,8 @@ document.addEventListener('click', e => {
   const a = e.target.closest('[data-act]'); if (!a) return;
   if (a.dataset.act === 'ocapply') {
     let n = 0; for (const i of ui.ocr.itens) if (i.on) { cur().b[i.k] = i.v; n++; }
-    const rasc = cur().rascunho; cur().exemplo = false; cur().rascunho = false; D.save(); ui.ocr = { itens: [], linhas: [], busy: false, status: '', erro: '' }; toast(`${n} campos aplicados`); if (rasc) location.hash = '#/otimizar'; else refresh();
+    if (cur().rascunho) marcar(cur(), ui.ocr.itens.filter(i => i.on).map(i => i.k)); else cur().exemplo = false;
+    D.save(); ui.ocr = { itens: [], linhas: [], busy: false, status: '', erro: '' }; toast(cur().rascunho ? `${n} campos carregados. Confira e confirme embaixo.` : `${n} campos aplicados`); refresh();
   } else if (a.dataset.act === 'occlear') { ui.ocr = { itens: [], linhas: [], busy: false, status: '', erro: '' }; ocrRender(); }
 });
 
@@ -369,7 +397,10 @@ document.addEventListener('click', e => {
     case 'usar': d.active = id; D.save(); toast('Build ativa trocada'); refresh(); break;
     case 'editar': d.active = id; D.save(); location.hash = '#/ficha'; break;
     case 'dup': { const x = d.builds.find(v => v.id === id); const n = { id: 'b' + Date.now(), nome: x.nome + ' (cópia)', b: { ...x.b } }; d.builds.push(n); d.active = n.id; D.save(); refresh(); break; }
-    case 'criar': { const n = { id: 'b' + Date.now(), nome: 'Minha build', rascunho: true, b: { ...TL.BUILD } }; d.builds.push(n); d.active = n.id; D.save(); if (location.hash === '#/ficha') render(); else location.hash = '#/ficha'; if (a.dataset.m === 'manual') setTimeout(() => { const el = $('#nome'); if (el) { el.focus(); el.select(); } }, 50); break; }
+    case 'criar': { const n = { id: 'b' + Date.now(), nome: 'Minha build', rascunho: true, anterior: d.active, tocados: [], b: { ...TL.BUILD } }; d.builds.push(n); d.active = n.id; ui.metodo = a.dataset.m || 'print'; ui.ocr = { itens: [], linhas: [], busy: false, status: '', erro: '' }; D.save(); if (location.hash === '#/ficha') render(); else location.hash = '#/ficha'; break; }
+    case 'metodo': ui.metodo = a.dataset.k; refresh(); break;
+    case 'cancelar': { const c = cur(); d.builds = d.builds.filter(v => v.id !== c.id); d.active = d.builds.find(v => v.id === c.anterior) ? c.anterior : d.builds[0].id; D.save(); toast('Criação cancelada'); location.hash = '#/inicio'; break; }
+    case 'confirmar': { const c = cur(); c.rascunho = false; c.exemplo = false; delete c.anterior; if (!c.tocados || !c.tocados.length) toast('Build criada com os valores do exemplo'); else toast('Build criada'); delete c.tocados; D.save(); location.hash = '#/otimizar'; break; }
     case 'nova': { const n = { id: 'b' + Date.now(), nome: 'Nova build', b: { ...B() } }; d.builds.push(n); d.active = n.id; D.save(); location.hash = '#/ficha'; break; }
     case 'del': if (d.builds.length > 1) { d.builds = d.builds.filter(v => v.id !== id); if (d.active === id) d.active = d.builds[0].id; D.save(); refresh(); } break;
     case 'wfadd': if (d.whatif.length < 6) { d.whatif.push({ chave: 'amp', delta: 100 }); D.save(); refresh(); } break;
@@ -377,12 +408,12 @@ document.addEventListener('click', e => {
     case 'preset': d.whatif = PRESETS[Number(a.dataset.i)][1].map(([chave, delta]) => ({ chave, delta })); D.save(); refresh(); break;
     case 'exemplo': cur().b = { ...TL.BUILD }; cur().exemplo = true; D.save(); toast('Exemplo carregado'); refresh(); break;
     case 'jsoncopy': { const txt = JSON.stringify({ build: B() }, null, 1); $('#json').value = txt; (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => toast('Ficha copiada'), () => { $('#json').select(); toast('Selecionei o texto: copie com Ctrl+C'); }); break; }
-    case 'jsonapply': try { const j = JSON.parse($('#json').value), b = j.build || j; let n = 0; for (const k in TL.BUILD) if (typeof b[k] === 'number') { cur().b[k] = b[k]; n++; } cur().exemplo = false; cur().rascunho = false; D.save(); toast(n ? `${n} campos carregados` : 'Nenhum campo reconhecido'); refresh(); } catch (err) { toast('JSON inválido'); } break;
+    case 'jsonapply': try { const j = JSON.parse($('#json').value), b = j.build || j; let n = 0; const ks = []; for (const k in TL.BUILD) if (typeof b[k] === 'number') { cur().b[k] = b[k]; n++; ks.push(k); } if (cur().rascunho) marcar(cur(), ks); else cur().exemplo = false; D.save(); toast(n ? `${n} campos carregados` : 'Nenhum campo reconhecido'); refresh(); } catch (err) { toast('JSON inválido'); } break;
   }
 });
 document.addEventListener('input', e => {
   const t = e.target, d = D.data;
-  if (t.dataset.k && !t.dataset.act) { cur().b[t.dataset.k] = Number(t.value) || 0; cur().exemplo = false; cur().rascunho = false; D.save(); }
+  if (t.dataset.k && !t.dataset.act) { cur().b[t.dataset.k] = Number(t.value) || 0; if (cur().rascunho) { marcar(cur(), [t.dataset.k]); const el = $('.cb-t'); if (el) el.innerHTML = cbTexto(cur()); } else cur().exemplo = false; D.save(); }
   else if (t.id === 'nome') { cur().nome = t.value; D.save(); }
   else if (t.dataset.nome) { d.builds.find(x => x.id === t.dataset.nome).nome = t.value; D.save(); }
   else if (t.dataset.wf !== undefined) { d.whatif[t.dataset.wf][t.dataset.f] = t.value; D.save(); $('#wfo').innerHTML = wfOut(); }

@@ -59,6 +59,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .pillbtn.cta { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .pillbtn.cta:hover { filter: brightness(1.08); }
 .card.start { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow); margin-bottom: 16px; }
+.metodos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.metodo { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 12px; border: 2px solid var(--line2); background: var(--card); color: var(--ink); border-radius: 14px; cursor: pointer; font: inherit; }
+.metodo .mi { font-size: 20px; line-height: 1.2; } .metodo small { color: var(--muted); font-size: 12px; }
+.metodo:hover { border-color: var(--accent); }
+.metodo[aria-selected=true] { border-color: var(--accent); background: var(--accent-soft); }
+.confirmbar { position: sticky; bottom: 12px; z-index: 15; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 16px; padding: 12px 16px; border-radius: 16px; background: var(--card); border: 2px solid var(--accent); box-shadow: var(--shadow); }
+.confirmbar .cb-t b, .confirmbar .cb-t small { display: block; } .confirmbar .cb-t small { color: var(--muted); font-size: 12.5px; }
+@media (max-width: 899px) { .confirmbar { bottom: calc(72px + env(safe-area-inset-bottom, 0px)); } }
+@media (max-width: 560px) { .metodos { grid-template-columns: 1fr; } .metodo { flex-direction: row; align-items: center; gap: 10px; flex-wrap: wrap; } .metodo small { flex-basis: 100%; } }
 .btn.big { padding: 12px 18px; font-size: 15px; font-weight: 700; }
 .pillbtn small { color: var(--muted); font-weight: 500; }
 
