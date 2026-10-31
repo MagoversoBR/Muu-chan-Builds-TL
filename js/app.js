@@ -135,14 +135,20 @@ function pOtimizar() {
 const CW = 720, CH = 320, CM = { l: 56, r: 18, t: 18, b: 40 };
 function pCurvas() {
   const st = stat(ui.curva);
-  const pills = TL.STATS.map(s => `<button class="pill${s.chave === ui.curva ? ' on' : ''}" data-act="stat" data-k="${s.chave}">${esc(s.nome.replace(/ \(%\)/, ''))}</button>`).join('');
+  const b = B(), t = T(), o = O(), f = F();
+  const ativo = s => Math.abs(TL.ganho(b, s.chave, s.passo, f, t, o)) >= 0.005 || Math.abs(TL.ganho(b, s.chave, -s.passo, f, t, o)) >= 0.005;
+  const pills = TL.STATS.map(s => `<button class="pill${s.chave === ui.curva ? ' on' : ''}${ativo(s) ? '' : ' off'}" data-act="stat" data-k="${s.chave}"${ativo(s) ? '' : ` title="Não afeta o foco ${esc(focoNome())}"`}>${esc(s.nome.replace(/ \(%\)/, ''))}</button>`).join('');
   return `${topo('Curvas', 'Retorno decrescente de cada stat. A bolinha dourada é você.')}
   <div class="card"><div class="scrollx" role="tablist" aria-label="Stat">${pills}</div><div id="cv" style="margin-top:14px">${curvaHtml(st)}</div></div>`;
 }
 function curvaHtml(st) {
   const b = B(), t = T(), o = O(), f = F();
   const pts = TL.curva(b, st.chave, f, t, o, 100), cv = TL.valor(b, st.chave), ys = pts.map(p => p.y);
-  if (Math.max(...ys) - Math.min(...ys) < 0.005) return `<p class="note">${esc(st.nome)} não afeta o foco “${focoNome()}”. Troque o foco no botão do topo.</p>`;
+  if (Math.max(...ys) - Math.min(...ys) < 0.005) {
+    const alt = TL.STATS.find(s => s.chave !== st.chave && Math.abs(TL.ganho(b, s.chave, s.passo, f, t, o)) >= 0.005);
+    return `<div class="vazio"><b>${esc(st.nome)}</b> não muda o foco “${focoNome()}”, então não tem curva para mostrar.
+      <div class="row" style="margin-top:10px">${alt ? `<button class="btn main" data-act="stat" data-k="${alt.chave}">Ver a curva de ${esc(alt.nome.replace(/ \(%\)/, ''))}</button>` : ''}<button class="btn" data-act="ctx">Trocar o foco</button></div></div>`;
+  }
   const [lo, hi] = st.faixa; let y0 = Math.min(...ys, 100), y1 = Math.max(...ys, 100); const pad = (y1 - y0) * .06; y0 -= pad; y1 += pad;
   const X = x => CM.l + (x - lo) / (hi - lo) * (CW - CM.l - CM.r), Y = y => CH - CM.b - (y - y0) / (y1 - y0) * (CH - CM.t - CM.b);
   const nice = (a, c, n) => { const r = (c - a) / n, p = Math.pow(10, Math.floor(Math.log10(r))), q = r / p, s = (q < 1.5 ? 1 : q < 3.5 ? 2 : q < 7.5 ? 5 : 10) * p, out = []; for (let v = Math.ceil(a / s) * s; v <= c + 1e-9; v += s) out.push(v); return out; };
@@ -402,7 +408,7 @@ document.addEventListener('click', e => {
     case 'foco': d.foco = a.dataset.k; D.save(); ctxSheet(); break;
     case 'tipo': d.alvo.tipo = a.dataset.k; if (a.dataset.k === 'boneco') { d.alvo.tol = 0; d.alvo.esq = 0; } D.save(); ctxSheet(); break;
     case 'boss': d.alvo.tol = Number(a.dataset.v); D.save(); ctxSheet(); break;
-    case 'stat': ui.curva = a.dataset.k; render(); break;
+    case 'stat': ui.curva = a.dataset.k; render(); { const on = $('.scrollx .pill.on'); if (on && on.scrollIntoView) on.scrollIntoView({ inline: 'center', block: 'nearest' }); } break;
     case 'tema': d.tema = a.dataset.k; D.save(); tema(); refresh(); break;
     case 'usar': d.active = id; D.save(); toast('Build ativa trocada'); refresh(); break;
     case 'editar': d.active = id; D.save(); location.hash = '#/ficha'; break;

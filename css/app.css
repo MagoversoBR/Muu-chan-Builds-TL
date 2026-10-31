@@ -59,6 +59,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .pillbtn.cta { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .pillbtn.cta:hover { filter: brightness(1.08); }
 .card.start { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow); margin-bottom: 16px; }
+.pill.off { opacity: .45; }
+.vazio { padding: 18px; border: 1px dashed var(--line2); border-radius: 12px; color: var(--ink2); }
+@media (min-width: 900px) { .scrollx { flex-wrap: wrap; overflow-x: visible; } }
 .metodos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .metodo { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 12px; border: 2px solid var(--line2); background: var(--card); color: var(--ink); border-radius: 14px; cursor: pointer; font: inherit; }
 .metodo .mi { font-size: 20px; line-height: 1.2; } .metodo small { color: var(--muted); font-size: 12px; }
