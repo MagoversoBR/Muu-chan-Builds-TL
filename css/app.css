@@ -56,6 +56,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .ctx { display: flex; gap: 8px; flex-wrap: wrap; }
 .pillbtn { display: inline-flex; align-items: center; gap: 8px; background: var(--card); border: 1px solid var(--line2); color: var(--ink); border-radius: 99px; padding: 7px 14px; cursor: pointer; font-weight: 600; font-size: 13.5px; }
 .pillbtn:hover { border-color: var(--accent); }
+.pillbtn.cta { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.pillbtn.cta:hover { filter: brightness(1.08); }
+.card.start { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow); margin-bottom: 16px; }
+.btn.big { padding: 12px 18px; font-size: 15px; font-weight: 700; }
 .pillbtn small { color: var(--muted); font-weight: 500; }
 
 /* cards */

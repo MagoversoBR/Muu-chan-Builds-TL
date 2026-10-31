@@ -68,7 +68,7 @@ function topo(titulo, sub) {
   const t = T();
   const alvo = t.tipo === 'chefe' ? `Chefe · Tol ${fmt(t.tol)}` : t.tipo === 'mob' ? `Mob comum · Tol ${fmt(t.tol)}` : 'Boneco';
   return `<div class="top"><div class="title"><h1>${titulo}</h1>${sub ? `<p>${sub}</p>` : ''}</div>
-    <div class="ctx"><button class="pillbtn" data-act="goto" data-p="builds" title="Trocar de build">${esc(cur().nome)}</button>
+    <div class="ctx"><button class="pillbtn cta" data-act="criar" data-m="print">＋ Criar minha build</button><button class="pillbtn" data-act="goto" data-p="builds" title="Trocar de build">${esc(cur().nome)}</button>
     <button class="pillbtn" data-act="ctx">${alvo}<small>· ${focoNome()}</small></button></div></div>`;
 }
 
@@ -85,7 +85,12 @@ function pInicio() {
   if (b.vel_ataque >= 100) alertas.push(`Velocidade de Ataque em ${fmt(b.vel_ataque, 1)}%: o teto é 150%, restam ${fmt(Math.max(0, 150 - b.vel_ataque), 1)} pontos.`);
   for (const r of rows) if (['crit', 'pesado', 'acerto', 'amp'].includes(r.s.chave) && r.up > 0 && r.up < 0.5) alertas.push(`${r.s.nome}: +${fmt(r.s.passo)} rende só ${fmt(r.up, 2)}% de ${focoNome().toLowerCase()}.`);
   const capBar = (v, cap) => `<div class="bar" style="margin-top:6px"><i class="f-${v >= cap ? 'crit' : v >= cap * .9 ? 'warn' : 'good'}" style="width:${Math.min(100, v / cap * 100).toFixed(0)}%"></i></div>`;
+  const novo = cur().exemplo || cur().rascunho;
+  const comece = novo ? `<div class="card start"><h2>Comece pela sua build</h2>
+    <p class="sub">O que aparece abaixo ainda é a ficha de exemplo. Leva 1 minuto: mande um print da sua ficha e o app lê os números.</p>
+    <div class="row"><button class="btn main big" data-act="criar" data-m="print">📷 Criar com print da ficha</button><button class="btn big" data-act="criar" data-m="manual">✎ Digitar os números</button></div></div>` : '';
   return `<div class="banner"><img src="img/muu-chan.webp" alt="Muu-chan Builds"></div>
+  ${comece}
   ${topo('Início', 'Onde sua build está e o que mexer primeiro.')}
   <div class="card hero"><h2>${esc(cur().nome)}</h2>
     <p class="sub">${cur().exemplo ? 'Exemplo com a ficha do mago full. Edite na aba Ficha ou crie a sua em Builds.' : 'Build salva neste aparelho.'}</p>
@@ -214,7 +219,7 @@ function pBuilds() {
     <div class="row"><button class="btn sm main" data-act="usar" data-id="${x.id}">Usar</button><button class="btn sm" data-act="editar" data-id="${x.id}">Editar ficha</button><button class="btn sm" data-act="dup" data-id="${x.id}">Duplicar</button>${b0.length > 1 ? `<button class="btn sm danger" data-act="del" data-id="${x.id}">Excluir</button>` : ''}</div></div>`; };
   return `${topo('Builds', 'Salve várias fichas e compare.')}
   <div class="grid g2">${b0.map(card).join('')}</div>
-  <div class="row" style="margin-top:12px"><button class="btn main" data-act="nova">Nova build (cópia da ativa)</button></div>
+  <div class="row" style="margin-top:12px"><button class="btn main" data-act="criar" data-m="print">＋ Criar minha build</button><button class="btn" data-act="nova">Cópia da build ativa</button></div>
   <div class="card" style="margin-top:16px"><h2>Comparar duas builds</h2><p class="sub">Índices da segunda em relação à primeira, no alvo e premissas atuais.</p>
     <div class="grid g2"><label class="field"><span>Base</span><select data-cmp="A">${b0.map(x => `<option value="${x.id}"${x.id === ui.cmpA ? ' selected' : ''}>${esc(x.nome)}</option>`).join('')}</select></label>
     <label class="field"><span>Comparar com</span><select data-cmp="B">${b0.map(x => `<option value="${x.id}"${x.id === ui.cmpB ? ' selected' : ''}>${esc(x.nome)}</option>`).join('')}</select></label></div>
@@ -235,12 +240,13 @@ const CAMPOS = [['Ofensivo', [['dano_min', 'Dano Base mínimo'], ['dano_max', 'D
   ['Cura', [['cura', 'Cura (%)'], ['cura_cont', 'Cura Contínua de Habilidade (%)'], ['cura_rec', 'Cura Recebida (%)'], ['esc_div', 'Eficácia de cura da maestria (%)']]],
   ['Defesa', [['def_corpo', 'Defesa corpo a corpo'], ['def_mag', 'Defesa mágica'], ['resist', 'Resistência a Dano de Habilidade'], ['reducao', 'Redução de Dano (%)'], ['vida', 'Vida máxima']]]];
 function pFicha() {
-  const b = B();
-  return `${topo('Ficha', 'Os números da sua ficha de status. Salvam sozinhos.')}
-  <div class="card"><label class="field"><span>Nome da build</span><input type="text" id="nome" value="${esc(cur().nome)}"></label></div>
-  <div class="card" style="margin-top:16px">${CAMPOS.map(([g, cs]) => `<fieldset><legend>${g}</legend><div class="frm">${cs.map(([k, n]) => `<label class="field"><span>${n}</span><input type="number" step="any" value="${b[k]}" data-k="${k}"></label>`).join('')}</div></fieldset>`).join('')}</div>
-  <div class="card" style="margin-top:16px"><h2>Ler de um print</h2><p class="sub">Mande prints da ficha (Efeitos Básicos, Ataque e Proteção, aba Chefes). O app lê os números e você confere antes de aplicar. Na primeira vez ele baixa o leitor, então precisa de internet.</p>
-    <label class="drop" id="drop" for="ocrfile"><input type="file" id="ocrfile" accept="image/*" multiple hidden><b>Escolher prints</b> ou arrastar aqui<small>Também dá para colar com Ctrl+V</small></label><div id="ocrout">${ocrHtml()}</div></div>
+  const b = B(), rasc = cur().rascunho;
+  const nome = `<div class="card"><label class="field"><span>Nome da build</span><input type="text" id="nome" value="${esc(cur().nome)}"></label></div>`;
+  const campos = `<div class="card" style="margin-top:16px">${rasc ? '<p class="note z-warn" style="margin:0 0 10px">▲ Estes números ainda são do exemplo. Mande o print acima ou troque cada um pelo da sua ficha.</p>' : ''}${CAMPOS.map(([g, cs]) => `<fieldset><legend>${g}</legend><div class="frm">${cs.map(([k, n]) => `<label class="field"><span>${n}</span><input type="number" step="any" value="${b[k]}" data-k="${k}"></label>`).join('')}</div></fieldset>`).join('')}</div>`;
+  const print = `<div class="card${rasc ? ' start' : ''}" style="margin-top:16px"><h2>${rasc ? 'Passo 1: mande o print da sua ficha' : 'Ler de um print'}</h2><p class="sub">Mande prints da ficha (Efeitos Básicos, Ataque e Proteção, aba Chefes). O app lê os números e você confere antes de aplicar. Na primeira vez ele baixa o leitor, então precisa de internet.</p>
+    <label class="drop" id="drop" for="ocrfile"><input type="file" id="ocrfile" accept="image/*" multiple hidden><b>Escolher prints</b> ou arrastar aqui<small>Também dá para colar com Ctrl+V</small></label><div id="ocrout">${ocrHtml()}</div></div>`;
+  return `${topo('Ficha', rasc ? 'Nova build: mande o print ou digite os números. Salva sozinho.' : 'Os números da sua ficha de status. Salvam sozinhos.')}
+  ${nome}${rasc ? print + campos : campos + print}
   <div class="card" style="margin-top:16px"><h2>Importar e exportar</h2><p class="sub">Cole o JSON que o Claude devolve ao ler o print da sua ficha, ou copie o seu para guardar.</p>
     <textarea id="json" rows="6" spellcheck="false" placeholder='{"build": {"crit": 2726, "pesado": 1617.8, "dc": 22.1}}'></textarea>
     <div class="row" style="margin-top:10px"><button class="btn main" data-act="jsonapply">Aplicar JSON</button><button class="btn" data-act="jsoncopy">Copiar ficha atual</button><button class="btn" data-act="exemplo">Voltar ao exemplo</button></div>
@@ -328,7 +334,7 @@ document.addEventListener('click', e => {
   const a = e.target.closest('[data-act]'); if (!a) return;
   if (a.dataset.act === 'ocapply') {
     let n = 0; for (const i of ui.ocr.itens) if (i.on) { cur().b[i.k] = i.v; n++; }
-    cur().exemplo = false; D.save(); ui.ocr = { itens: [], linhas: [], busy: false, status: '', erro: '' }; toast(`${n} campos aplicados`); refresh();
+    const rasc = cur().rascunho; cur().exemplo = false; cur().rascunho = false; D.save(); ui.ocr = { itens: [], linhas: [], busy: false, status: '', erro: '' }; toast(`${n} campos aplicados`); if (rasc) location.hash = '#/otimizar'; else refresh();
   } else if (a.dataset.act === 'occlear') { ui.ocr = { itens: [], linhas: [], busy: false, status: '', erro: '' }; ocrRender(); }
 });
 
@@ -363,6 +369,7 @@ document.addEventListener('click', e => {
     case 'usar': d.active = id; D.save(); toast('Build ativa trocada'); refresh(); break;
     case 'editar': d.active = id; D.save(); location.hash = '#/ficha'; break;
     case 'dup': { const x = d.builds.find(v => v.id === id); const n = { id: 'b' + Date.now(), nome: x.nome + ' (cópia)', b: { ...x.b } }; d.builds.push(n); d.active = n.id; D.save(); refresh(); break; }
+    case 'criar': { const n = { id: 'b' + Date.now(), nome: 'Minha build', rascunho: true, b: { ...TL.BUILD } }; d.builds.push(n); d.active = n.id; D.save(); if (location.hash === '#/ficha') render(); else location.hash = '#/ficha'; if (a.dataset.m === 'manual') setTimeout(() => { const el = $('#nome'); if (el) { el.focus(); el.select(); } }, 50); break; }
     case 'nova': { const n = { id: 'b' + Date.now(), nome: 'Nova build', b: { ...B() } }; d.builds.push(n); d.active = n.id; D.save(); location.hash = '#/ficha'; break; }
     case 'del': if (d.builds.length > 1) { d.builds = d.builds.filter(v => v.id !== id); if (d.active === id) d.active = d.builds[0].id; D.save(); refresh(); } break;
     case 'wfadd': if (d.whatif.length < 6) { d.whatif.push({ chave: 'amp', delta: 100 }); D.save(); refresh(); } break;
@@ -370,12 +377,12 @@ document.addEventListener('click', e => {
     case 'preset': d.whatif = PRESETS[Number(a.dataset.i)][1].map(([chave, delta]) => ({ chave, delta })); D.save(); refresh(); break;
     case 'exemplo': cur().b = { ...TL.BUILD }; cur().exemplo = true; D.save(); toast('Exemplo carregado'); refresh(); break;
     case 'jsoncopy': { const txt = JSON.stringify({ build: B() }, null, 1); $('#json').value = txt; (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => toast('Ficha copiada'), () => { $('#json').select(); toast('Selecionei o texto: copie com Ctrl+C'); }); break; }
-    case 'jsonapply': try { const j = JSON.parse($('#json').value), b = j.build || j; let n = 0; for (const k in TL.BUILD) if (typeof b[k] === 'number') { cur().b[k] = b[k]; n++; } cur().exemplo = false; D.save(); toast(n ? `${n} campos carregados` : 'Nenhum campo reconhecido'); refresh(); } catch (err) { toast('JSON inválido'); } break;
+    case 'jsonapply': try { const j = JSON.parse($('#json').value), b = j.build || j; let n = 0; for (const k in TL.BUILD) if (typeof b[k] === 'number') { cur().b[k] = b[k]; n++; } cur().exemplo = false; cur().rascunho = false; D.save(); toast(n ? `${n} campos carregados` : 'Nenhum campo reconhecido'); refresh(); } catch (err) { toast('JSON inválido'); } break;
   }
 });
 document.addEventListener('input', e => {
   const t = e.target, d = D.data;
-  if (t.dataset.k && !t.dataset.act) { cur().b[t.dataset.k] = Number(t.value) || 0; cur().exemplo = false; D.save(); }
+  if (t.dataset.k && !t.dataset.act) { cur().b[t.dataset.k] = Number(t.value) || 0; cur().exemplo = false; cur().rascunho = false; D.save(); }
   else if (t.id === 'nome') { cur().nome = t.value; D.save(); }
   else if (t.dataset.nome) { d.builds.find(x => x.id === t.dataset.nome).nome = t.value; D.save(); }
   else if (t.dataset.wf !== undefined) { d.whatif[t.dataset.wf][t.dataset.f] = t.value; D.save(); $('#wfo').innerHTML = wfOut(); }
