@@ -1,0 +1,17 @@
+{
+  "name": "Muu-chan Builds TL",
+  "short_name": "Muu-chan TL",
+  "description": "Retorno decrescente de cada stat e simulação de trocas para Throne and Liberty.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f0d17",
+  "theme_color": "#0f0d17",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

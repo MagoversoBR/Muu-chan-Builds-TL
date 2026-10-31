@@ -1,0 +1,535 @@
+<meta charset="utf-8">
+<title>Otimizador de Build</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&display=swap">
+<style>
+/* Layout: barra de alvo e foco no topo, painéis por abas, leitura em tabela + gráfico de retorno. */
+:root {
+  --plane: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,.10); --series: #2a78d6; --series-soft: rgba(42,120,214,.12);
+  --good: #0ca30c; --warn: #fab219; --crit: #d03b3b; --good-ink: #006300; --warn-ink: #7a5200; --crit-ink: #a52a2a;
+  --band-a: .13; --field: #ffffff;
+  --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --plane: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,.10); --series: #3987e5; --series-soft: rgba(57,135,229,.18);
+  --good-ink: #0ca30c; --warn-ink: #fab219; --crit-ink: #ec6a6a; --band-a: .2; --field: #121211; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --plane: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,.10); --series: #3987e5; --series-soft: rgba(57,135,229,.18);
+  --good-ink: #0ca30c; --warn-ink: #fab219; --crit-ink: #ec6a6a; --band-a: .2; --field: #121211; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--plane); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.5;
+  padding-block: 20px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+h1 { font-family: var(--display); font-weight: 700; font-size: 2.1rem; line-height: 1.05; margin: 0; letter-spacing: .01em; text-wrap: balance; }
+.sub { color: var(--ink2); margin: 4px 0 0; max-width: 68ch; }
+.aviso { font-size: 13px; color: var(--ink2); border-left: 3px solid var(--axis); padding: 2px 0 2px 10px; max-width: 80ch; }
+.bar-top { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: grid; grid-template-columns: 1.5fr 1fr; gap: 14px 24px; }
+.bar-top > div { min-width: 0; }
+label.lab, .lab { display: block; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink2); margin-bottom: 4px; }
+select, input[type=number], textarea { background: var(--field); color: var(--ink); border: 1px solid var(--axis); border-radius: 6px; padding: 7px 9px; font: inherit; min-width: 0; }
+select { max-width: 100%; }
+input[type=number] { width: 7.5em; font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; accent-color: var(--series); }
+:focus-visible { outline: 2px solid var(--series); outline-offset: 2px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pill { border: 1px solid var(--axis); background: transparent; color: var(--ink2); border-radius: 99px; padding: 3px 10px; font: inherit; font-size: 12.5px; cursor: pointer; }
+.pill.on, .pill:hover { border-color: var(--series); color: var(--ink); background: var(--series-soft); }
+.res { font-size: 13px; color: var(--ink2); margin-top: 6px; }
+.res b { color: var(--ink); font-variant-numeric: tabular-nums; }
+[role=tablist] { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--axis); }
+[role=tab] { background: none; border: 0; border-bottom: 3px solid transparent; padding: 9px 14px 8px; font: inherit; font-weight: 600; color: var(--ink2); cursor: pointer; margin-bottom: -1px; }
+[role=tab][aria-selected=true] { color: var(--ink); border-bottom-color: var(--series); }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; min-width: 0; }
+.lead { font-size: 16.5px; margin: 0 0 12px; max-width: 70ch; }
+.note { font-size: 13px; color: var(--ink2); margin: 10px 0 0; max-width: 80ch; }
+.scroll { overflow-x: auto; }
+table.rank { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.rank th, table.rank td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--grid); vertical-align: middle; }
+table.rank thead th { font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: var(--ink2); font-weight: 600; }
+table.rank tbody th { font-weight: 600; }
+table.rank small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.down { color: var(--ink2); }
+.barcell { display: flex; align-items: center; gap: 10px; min-width: 180px; }
+.bar { flex: 1; height: 10px; background: var(--grid); border-radius: 0 4px 4px 0; overflow: hidden; min-width: 60px; }
+.bar i { display: block; height: 100%; border-radius: 0 4px 4px 0; }
+i.z-good, .band.z-good { background: var(--good); fill: var(--good); } i.z-warn { background: var(--warn); } i.z-crit { background: var(--crit); } i.z-zero { background: var(--axis); }
+.chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 99px; border: 1px solid currentColor; white-space: nowrap; }
+.chip.z-good { color: var(--good-ink); } .chip.z-warn { color: var(--warn-ink); } .chip.z-crit { color: var(--crit-ink); } .chip.z-zero { color: var(--ink2); }
+.chart { position: relative; }
+.chart svg { width: 100%; height: auto; display: block; touch-action: pan-y; }
+.band { fill-opacity: var(--band-a); } .band.z-warn { fill: var(--warn); } .band.z-crit { fill: var(--crit); } .band.z-zero { fill: var(--axis); }
+.grid { stroke: var(--grid); stroke-width: 1; } .axis { stroke: var(--axis); } .ref { stroke: var(--muted); stroke-dasharray: 2 4; }
+.tick { fill: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; } .lbl { fill: var(--ink2); font-size: 12px; font-weight: 600; }
+.line { fill: none; stroke: var(--series); stroke-width: 2; stroke-linejoin: round; }
+.you { fill: var(--series); stroke: var(--surface); stroke-width: 2; }
+.stop { stroke: var(--ink2); stroke-dasharray: 4 3; } .xh { stroke: var(--ink2); stroke-width: 1; }
+.tip { position: absolute; background: var(--surface); color: var(--ink); border: 1px solid var(--axis); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; line-height: 1.45; pointer-events: none; box-shadow: 0 4px 14px rgba(0,0,0,.18); width: 180px; }
+.tip .chip { margin-top: 3px; }
+.tools { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin-bottom: 12px; }
+.wf-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+.wf-row select { flex: 1 1 240px; }
+.unit { color: var(--ink2); font-size: 13px; }
+button.ghost, button.main { font: inherit; font-size: 13.5px; border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+button.ghost { background: transparent; color: var(--ink2); border: 1px solid var(--axis); }
+button.ghost:hover { color: var(--ink); border-color: var(--ink2); }
+button.main { background: var(--series); color: #fff; border: 1px solid var(--series); font-weight: 600; }
+.verdict { font-size: 16.5px; font-weight: 600; margin: 14px 0 8px; display: flex; gap: 8px; }
+.v-good { color: var(--good-ink); } .v-warn { color: var(--warn-ink); } .v-crit { color: var(--crit-ink); } .v-zero { color: var(--ink2); }
+td.up { color: var(--good-ink); font-weight: 600; } td.dn { color: var(--crit-ink); font-weight: 600; }
+fieldset { border: 1px solid var(--grid); border-radius: 8px; padding: 10px 12px 12px; margin: 0 0 12px; min-width: 0; }
+legend { font-family: var(--display); font-weight: 700; font-size: 1.15rem; padding: 0 6px; }
+fieldset label { display: grid; grid-template-columns: minmax(0, 1fr) 8.5em; gap: 10px; align-items: center; padding: 3px 0; font-size: 14px; }
+textarea { width: 100%; min-height: 110px; font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; }
+details { margin-top: 12px; } summary { cursor: pointer; color: var(--ink2); font-size: 13.5px; }
+.conf { font-weight: 600; font-size: 12.5px; } .c-alta { color: var(--good-ink); } .c-media { color: var(--warn-ink); } .c-baixa { color: var(--crit-ink); }
+@media (max-width: 720px) { .bar-top { grid-template-columns: 1fr; } h1 { font-size: 1.8rem; } .barcell { min-width: 140px; } }
+@media (prefers-reduced-motion: no-preference) { .bar i { transition: width .25s ease; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Otimizador de Build</h1>
+    <p class="sub">Mostra onde cada ponto de stat rende mais, onde já não vale a pena e o que acontece se você trocar um pelo outro.</p>
+  </header>
+  <p class="aviso">Aproximação por engenharia reversa, medida em outubro de 2026: serve para comparar caminhos, não garante o número exato do jogo. Efeitos de set, maestria e runa que a ficha não mostra ficam de fora, e cada build é uma build.</p>
+
+  <section class="bar-top" aria-label="Alvo e foco">
+    <div>
+      <span class="lab">Alvo</span>
+      <div class="row">
+        <select id="alvo-tipo" aria-label="Tipo de alvo"><option value="chefe">Chefe (vale a aba Chefes)</option><option value="mob">Mob comum</option><option value="boneco">Boneco de treino</option></select>
+        <label class="row unit" for="alvo-esq">Esquiva de pesado <input id="alvo-esq" type="number" min="0" step="any"></label>
+      </div>
+      <div class="row" style="margin-top:8px"><label class="unit" for="alvo-tol" style="min-width:9.5em">Tolerância de crítico</label><input id="alvo-tol" type="range" min="0" max="2000" step="10" style="flex:1 1 180px"><input id="alvo-tol-n" type="number" min="0" step="10" aria-label="Tolerância de crítico"></div>
+      <div class="row" id="bosses" style="margin-top:8px" aria-label="Chefes medidos"></div>
+      <p class="res" id="alvo-res"></p>
+    </div>
+    <div>
+      <label class="lab" for="foco">Foco da otimização</label>
+      <select id="foco"></select>
+      <details><summary>Premissas de uso</summary>
+        <label class="lab" for="parte_skill" style="margin-top:8px">Parte do dano que vem de skills: <span id="parte_skill-n"></span></label><input id="parte_skill" type="range" min="0" max="100" step="5">
+        <label class="lab" for="parte_recarga" style="margin-top:8px">Parte das skills limitada por recarga: <span id="parte_recarga-n"></span></label><input id="parte_recarga" type="range" min="0" max="100" step="5">
+      </details>
+    </div>
+  </section>
+
+  <div role="tablist" aria-label="Seções">
+    <button role="tab" data-tab="onde" id="t-onde" aria-controls="p-onde">Onde investir</button>
+    <button role="tab" data-tab="curva" id="t-curva" aria-controls="p-curva">Curvas</button>
+    <button role="tab" data-tab="whatif" id="t-whatif" aria-controls="p-whatif">E se?</button>
+    <button role="tab" data-tab="ficha" id="t-ficha" aria-controls="p-ficha">Sua ficha</button>
+    <button role="tab" data-tab="regras" id="t-regras" aria-controls="p-regras">Fórmulas e confiança</button>
+  </div>
+
+  <section class="panel" id="p-onde" role="tabpanel" aria-labelledby="t-onde"></section>
+
+  <section class="panel" id="p-curva" role="tabpanel" aria-labelledby="t-curva" hidden>
+    <div class="tools"><div><label class="lab" for="curva-stat">Stat</label><select id="curva-stat"></select></div></div>
+    <div id="curva-info"></div>
+    <div class="chart" id="curva-box"></div>
+    <div id="curva-tab"></div>
+  </section>
+
+  <section class="panel" id="p-whatif" role="tabpanel" aria-labelledby="t-whatif" hidden>
+    <p class="lead">“Consigo subir X, mas perco Y. Vale a pena?” Monte a troca e veja o efeito no foco escolhido e nos outros índices.</p>
+    <div id="wf-rows"></div>
+    <div class="row"><button type="button" class="ghost" id="wf-add">Adicionar mudança</button><span class="unit">Use números negativos para perdas.</span></div>
+    <div id="wf-out"></div>
+  </section>
+
+  <section class="panel" id="p-ficha" role="tabpanel" aria-labelledby="t-ficha" hidden>
+    <p class="lead">Os valores abaixo são o exemplo (ficha do mago full, 29/10/2026). Para usar a sua: mande o print ou o vídeo da ficha para o Claude no chat e cole aqui o JSON que ele devolver, ou edite os campos.</p>
+    <div class="row" style="margin-bottom:12px"><button type="button" class="main" id="json-apply">Aplicar JSON</button><button type="button" class="ghost" id="json-exemplo">Voltar ao exemplo</button><button type="button" class="ghost" id="json-copy">Copiar ficha atual</button><span class="unit" id="json-msg" role="status"></span></div>
+    <label class="lab" for="json">Colar ficha (JSON)</label>
+    <textarea id="json" spellcheck="false" placeholder='{"build": {"crit": 2726, "pesado": 1617.8, "dc": 22.1}, "alvo": {"tol": 300}}'></textarea>
+    <div id="ficha-form" style="margin-top:16px"></div>
+  </section>
+
+  <section class="panel" id="p-regras" role="tabpanel" aria-labelledby="t-regras" hidden>
+    <p class="lead">O que o motor assume e o quanto confio em cada parte.</p>
+    <div class="scroll"><table class="rank"><thead><tr><th>Parte</th><th>Fórmula usada</th><th>Confiança</th></tr></thead><tbody>
+      <tr><th scope="row">Chance de crítico, pesado e acerto</th><td>d ÷ (d + 1.000), d = rating (+ aba Chefes) menos Tolerância ou Esquiva do alvo. Acerto é uma aproximação grosseira.</td><td><span class="conf c-alta">Alta</span> (acerto: baixa)</td></tr>
+      <tr><th scope="row">Crítico</th><td>Fixa o dano no máximo da faixa de Dano Base e multiplica por (1 + Dano Crítico).</td><td><span class="conf c-alta">Alta</span></td></tr>
+      <tr><th scope="row">Pesado</th><td>Multiplica por (1 + Dano de Ataque Pesado); crítico e pesado são independentes.</td><td><span class="conf c-alta">Alta</span></td></tr>
+      <tr><th scope="row">Ampliação no dano</th><td>1 + A ÷ (A + 1.000), medida até 1.136,5. Não vale no ataque básico.</td><td><span class="conf c-alta">Alta</span></td></tr>
+      <tr><th scope="row">Ampliação na cura</th><td>1 + 1,014 · A ÷ (A + 3.060), curva mais fraca que a do dano.</td><td><span class="conf c-alta">Alta</span></td></tr>
+      <tr><th scope="row">Cura</th><td>(1 + Cura) · (1 + Cura Recebida) · maestria; Dano Crítico não age; pesado dobra. A chance de crítico e pesado de cura usa o alvo da cura (hipótese).</td><td><span class="conf c-media">Média</span></td></tr>
+      <tr><th scope="row">Cura contínua (ticks)</th><td>(1 + Cura Contínua) · Amplificação (curva de cura) · (1 + Cura Recebida). A Cura não soma no bloco: o nível absoluto do Flashwave confere em ~1% (3,15 previsto contra 3,11 medido) e o aditivo daria o dobro. Direta e Fonte da Vida não usam a Cura Contínua. Sem explicação: ao trocar item de Cura Contínua a queda medida foi de 5% e a fórmula prevê 13%.</td><td><span class="conf c-media">Média</span> (nível absoluto firme, variação pequena)</td></tr>
+      <tr><th scope="row">Velocidade de Recarga</th><td>Skills ganham (1 + V ÷ 100), com teto de 120%; vale só na parte limitada por recarga.</td><td><span class="conf c-media">Média</span></td></tr>
+      <tr><th scope="row">Velocidade de Ataque</th><td>Ataque básico ganha (1 + VA ÷ 100), com teto de 150% (máximo do jogo, informado por você).</td><td><span class="conf c-alta">Alta</span></td></tr>
+      <tr><th scope="row">Defesa</th><td>K ÷ (K + Defesa), K 2.500 físico e 860 mágico; Resistência de habilidade com K 900; Redução é percentual direto.</td><td><span class="conf c-media">Média</span> (um mob por tipo)</td></tr>
+      <tr><th scope="row">Tolerância do chefe</th><td>Varia de 130 a 1.500 entre os chefes medidos; padrão 300. Esquiva de pesado perto de 0.</td><td><span class="conf c-media">Média</span></td></tr>
+      <tr><th scope="row">PvP</th><td>Não medido. Este motor só descreve PvE.</td><td><span class="conf c-baixa">Sem dado</span></td></tr>
+    </tbody></table></div>
+    <p class="note">O dano é calculado para uma skill de referência (475% do Dano Base + 232, como o Raio em Cadeia) e para o ataque básico, misturados pela parte de skills que você definir. Uma rotação real tem skills com coeficientes diferentes, então trate o resultado como direção, não como DPS exato.</p>
+  </section>
+</div>
+<script>
+// Motor de formulas de Throne and Liberty (aproximado, engenharia reversa). Espelho de engine.py.
+const TL = (() => {
+  const K_CHANCE = 1000, K_AMP = 1000, K_AMP_CURA = 3060, K_DEF_FIS = 2500, K_DEF_MAG = 860, K_RES = 900, V_TETO = 120, AS_TETO = 150;
+
+  const BUILD = {
+    dano_min: 555, dano_max: 1491, crit: 2726, pesado: 1617.8, acerto: 1356,
+    crit_chefe: 12, pesado_chefe: 933, dc: 22.1, dap: 141, dap_extra: 14,
+    amp: 850.5, bonus: 62, amp_magico: 3, recarga: 105.8, vel_ataque: 123.6,
+    cura: 15.08, cura_cont: 0, cura_rec: 4, esc_div: 0,
+    def_corpo: 4180, def_mag: 4195, resist: 338, reducao: 44, vida: 30293,
+  };
+  const ALVO = { tipo: 'chefe', tol: 300, esq: 0, aliado_tol: 0, aliado_esq: 0 };
+  const OPC = { coef: 4.75, fixo: 232, monstro: 1.9, parte_skill: 0.85, parte_recarga: 0.5 };
+
+  const chance = d => { d = Math.max(0, d); return d / (d + K_CHANCE); };
+  const fAmp = a => 1 + a / (a + K_AMP);
+  const fAmpCura = a => 1 + 1.014 * a / (a + K_AMP_CURA);
+  const chanceAcerto = a => (a + 18) / (a + 105);
+
+  function chances(b, t) {
+    const chefe = t.tipo === 'chefe';
+    return [chance(b.crit + (chefe ? b.crit_chefe : 0) - t.tol), chance(b.pesado + (chefe ? b.pesado_chefe : 0) - t.esq)];
+  }
+
+  function dano(b, t, o) {
+    const [pc, ph] = chances(b, t);
+    const rm = (b.dano_min + b.dano_max) / 2, rx = b.dano_max;
+    const dc = b.dc / 100, dap = (b.dap + b.dap_extra) / 100, mag = 1 + b.amp_magico / 100;
+    const acerto = chanceAcerto(b.acerto), pes = 1 + ph * dap;
+    const skill = acerto * (((1 - pc) * (o.coef * rm + o.fixo) + pc * (o.coef * rx + o.fixo) * (1 + dc)) * fAmp(b.amp) * o.monstro * mag * pes + b.bonus);
+    const basico = acerto * (((1 - pc) * rm + pc * rx * (1 + dc)) * mag * pes + b.bonus);
+    const s = o.parte_recarga;
+    return {
+      skill: skill * ((1 - s) + s * (1 + Math.min(b.recarga, V_TETO) / 100)),
+      basico: basico * (1 + Math.min(b.vel_ataque, AS_TETO) / 100),
+    };
+  }
+
+  function cura(b, t) {
+    const pc = chance(b.crit - t.aliado_tol), ph = chance(b.pesado - t.aliado_esq);
+    const rm = (b.dano_min + b.dano_max) / 2, rx = b.dano_max, dap = b.dap / 100;
+    const mult = (1 + b.cura / 100) * fAmpCura(b.amp) * (1 + b.cura_rec / 100) * (1 + b.esc_div / 100);
+    const direta = ((1 - pc) * (3.15 * rm + 1100) + pc * (3.15 * rx + 1100)) * mult * (1 + ph * dap);
+    const ticks = (1 + b.cura_cont / 100) * fAmpCura(b.amp) * (1 + b.cura_rec / 100) * (1 + ph * dap) * (0.488 * rm + 225) * 3;
+    return { direta, ticks };
+  }
+
+  function danoRecebido(b) {
+    return {
+      fis: K_DEF_FIS / (K_DEF_FIS + b.def_corpo) * (1 - b.reducao / 100),
+      mag: K_DEF_MAG / (K_DEF_MAG + b.def_mag) * K_RES / (K_RES + b.resist),
+    };
+  }
+
+  function metricas(b, t, o) {
+    const d = dano(b, t, o), c = cura(b, t), r = danoRecebido(b);
+    return { skill: d.skill, basico: d.basico, cura: c.direta, hot: c.ticks, vida_fis: b.vida / r.fis, vida_mag: b.vida / r.mag };
+  }
+
+  function indices(b, base, t, o) {
+    const m = metricas(b, t, o), m0 = metricas(base, t, o), out = {};
+    for (const k in m) out[k] = 100 * m[k] / m0[k];
+    out.dano = o.parte_skill * out.skill + (1 - o.parte_skill) * out.basico;
+    out.sobrev = (out.vida_fis + out.vida_mag) / 2;
+    return out;
+  }
+
+  // chave, nome, passo, rotulo, grupo, faixa do grafico [min, max]
+  const STATS = [
+    ['dano_base', 'Dano Base (%)', 5, '+5%', 'ofensivo', [-40, 80]],
+    ['crit', 'Chance de crítico', 100, '+100', 'ofensivo', [0, 6000]],
+    ['pesado', 'Chance de ataque pesado', 100, '+100', 'ofensivo', [0, 6000]],
+    ['acerto', 'Chance de acerto', 100, '+100', 'ofensivo', [0, 3000]],
+    ['dc', 'Dano Crítico (%)', 10, '+10', 'ofensivo', [0, 400]],
+    ['dap', 'Dano de Ataque Pesado (%)', 10, '+10', 'ofensivo', [0, 400]],
+    ['amp', 'Ampliação de Dano de Habilidade', 100, '+100', 'ofensivo', [0, 3000]],
+    ['bonus', 'Bônus de Dano', 10, '+10', 'ofensivo', [0, 600]],
+    ['recarga', 'Velocidade de Recarga (%)', 10, '+10', 'ofensivo', [0, 140]],
+    ['vel_ataque', 'Velocidade de Ataque (%)', 10, '+10', 'ofensivo', [0, 170]],
+    ['cura', 'Cura (%)', 10, '+10', 'cura', [0, 600]],
+    ['cura_cont', 'Cura Contínua de Habilidade (%)', 10, '+10', 'cura', [0, 600]],
+    ['cura_rec', 'Cura Recebida (%)', 10, '+10', 'cura', [0, 200]],
+    ['def_corpo', 'Defesa corpo a corpo', 100, '+100', 'defesa', [0, 8000]],
+    ['def_mag', 'Defesa mágica', 100, '+100', 'defesa', [0, 8000]],
+    ['resist', 'Resistência a Dano de Habilidade', 100, '+100', 'defesa', [0, 2000]],
+    ['reducao', 'Redução de Dano (%)', 10, '+10', 'defesa', [0, 80]],
+    ['vida', 'Vida máxima', 1000, '+1.000', 'defesa', [10000, 80000]],
+  ].map(([chave, nome, passo, rotulo, grupo, faixa]) => ({ chave, nome, passo, rotulo, grupo, faixa }));
+
+  function valor(b, chave) { return chave === 'dano_base' ? 0 : b[chave]; }
+
+  function aplicar(b, chave, delta) {
+    const n = { ...b };
+    if (chave === 'dano_base') { n.dano_min = b.dano_min * (1 + delta / 100); n.dano_max = b.dano_max * (1 + delta / 100); }
+    else n[chave] = Math.max(0, b[chave] + delta);
+    return n;
+  }
+
+  // Foco: pesos sobre os indices. Em cada foco o ganho e medido nesse indice.
+  const FOCOS = {
+    dano: { nome: 'Dano', pesos: { dano: 1 } },
+    cura: { nome: 'Cura direta', pesos: { cura: 1 } },
+    hot: { nome: 'Cura contínua', pesos: { hot: 1 } },
+    sobrev: { nome: 'Sobrevivência', pesos: { sobrev: 1 } },
+    misto: { nome: 'Dano + sobrevivência', pesos: { dano: 0.7, sobrev: 0.3 } },
+  };
+  const foco = (ind, f) => Object.entries(FOCOS[f].pesos).reduce((s, [k, w]) => s + w * ind[k], 0);
+
+  // Ganho (em %) do foco ao mexer 'delta' no stat
+  const ganho = (b, chave, delta, f, t, o) => foco(indices(aplicar(b, chave, delta), b, t, o), f) - 100;
+
+  // Valor de um ponto do stat na curva: indice do foco com o stat em x, relativo a build atual
+  function curva(b, chave, f, t, o, n = 80) {
+    const st = STATS.find(s => s.chave === chave), [lo, hi] = st.faixa, base = valor(b, chave), pts = [];
+    for (let i = 0; i <= n; i++) {
+      const x = lo + (hi - lo) * i / n;
+      const bb = aplicar(b, chave, x - base);
+      pts.push({ x, y: foco(indices(bb, b, t, o), f), marg: ganho(bb, chave, st.passo, f, t, o) });
+    }
+    return pts;
+  }
+
+  return { BUILD, ALVO, OPC, STATS, FOCOS, chance, fAmp, fAmpCura, chances, metricas, indices, aplicar, valor, ganho, curva, foco, V_TETO };
+})();
+if (typeof module !== 'undefined') module.exports = TL;
+
+// Interface do otimizador. Usa o motor TL (engine.js).
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const fmt = (n, d = 0) => n.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
+const sgn = (n, d = 2) => (n >= 0 ? '+' : '−') + fmt(Math.abs(n), d) + '%';
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+const S = {
+  b: { ...TL.BUILD }, t: { ...TL.ALVO }, o: { ...TL.OPC },
+  foco: 'dano', tab: 'onde', curva: 'crit',
+  whatif: [{ chave: 'dc', delta: 20 }, { chave: 'pesado', delta: -300 }],
+};
+const BOSSES = [['Golem', 130], ['Vulkan', 170], ['Chefe médio', 300], ['Calanthia', 540], ['Zairos', 1500]];
+
+// Zona de retorno: ganho do foco por um passo do stat
+function zona(g) {
+  const a = Math.abs(g);
+  if (a < 0.005) return { k: 'zero', rot: 'Não afeta', ic: '–' };
+  if (g >= 1) return { k: 'good', rot: 'Rende bem', ic: '✓' };
+  if (g >= 0.5) return { k: 'warn', rot: 'Caro', ic: '▲' };
+  return { k: 'crit', rot: 'Quase não rende', ic: '●' };
+}
+const chip = z => `<span class="chip z-${z.k}"><span aria-hidden="true">${z.ic}</span>${z.rot}</span>`;
+const stat = c => TL.STATS.find(s => s.chave === c);
+
+function linhas() {
+  return TL.STATS.map(s => ({
+    s,
+    up: TL.ganho(S.b, s.chave, s.passo, S.foco, S.t, S.o),
+    down: TL.ganho(S.b, s.chave, -s.passo, S.foco, S.t, S.o),
+  }));
+}
+
+/* ---------- Onde investir ---------- */
+function renderOnde() {
+  const rows = linhas();
+  const ativos = rows.filter(r => Math.abs(r.up) >= 0.005).sort((a, b) => b.up - a.up);
+  const nomeFoco = TL.FOCOS[S.foco].nome.toLowerCase();
+  const max = Math.max(...ativos.map(r => r.up), 0.01);
+  const top = ativos[0];
+  const baratos = ativos.filter(r => r.down < 0 && TL.valor(S.b, r.s.chave) > 0 || r.s.chave === 'dano_base')
+    .sort((a, b) => b.down - a.down).filter(r => r.down < 0);
+  const solto = baratos[0];
+  let lead = '';
+  if (top) {
+    lead = `Para <strong>${nomeFoco}</strong>, o melhor retorno agora está em <strong>${esc(top.s.nome)}</strong> (${sgn(top.up)} por ${top.s.rotulo}).`;
+    if (solto) lead += ` O que menos dói tirar é <strong>${esc(solto.s.nome)}</strong> (${sgn(solto.down)} por −${top && solto.s.passo === 5 ? '5%' : fmt(solto.s.passo)}).`;
+  } else lead = 'Nenhum stat desta ficha muda esse foco.';
+  const linha = r => {
+    const z = zona(r.up), w = Math.max(0, r.up) / max * 100;
+    return `<tr>
+      <th scope="row">${esc(r.s.nome)}<small>${r.s.rotulo}</small></th>
+      <td class="barcell"><div class="bar"><i class="z-${z.k}" style="width:${w.toFixed(1)}%"></i></div><b class="num">${sgn(r.up)}</b></td>
+      <td class="num down">${Math.abs(r.down) < 0.005 ? '—' : sgn(r.down)}</td>
+      <td>${chip(z)}</td></tr>`;
+  };
+  $('#p-onde').innerHTML = `
+    <p class="lead">${lead}</p>
+    <div class="scroll"><table class="rank">
+      <thead><tr><th>Stat e passo</th><th>Ganho ao subir um passo</th><th>Perda ao descer um passo</th><th>Zona</th></tr></thead>
+      <tbody>${ativos.map(linha).join('')}</tbody></table></div>
+    <p class="note">Zona pelo ganho de um passo: <span class="chip z-good"><span aria-hidden="true">✓</span>rende bem</span> a partir de 1%, <span class="chip z-warn"><span aria-hidden="true">▲</span>caro</span> de 0,5% a 1%, <span class="chip z-crit"><span aria-hidden="true">●</span>quase não rende</span> abaixo de 0,5%. O passo é um aumento típico de equipamento (+100 de rating, +10 pontos), então compare com o custo real de cada um na sua build.</p>
+    ${ativos.length < TL.STATS.length ? `<details><summary>Stats que não afetam este foco (${TL.STATS.length - ativos.length})</summary><p class="note">${rows.filter(r => Math.abs(r.up) < 0.005).map(r => esc(r.s.nome)).join(', ')}.</p></details>` : ''}`;
+}
+
+/* ---------- Curvas ---------- */
+const W = 720, H = 320, M = { l: 56, r: 18, t: 18, b: 40 };
+function renderCurva() {
+  const st = stat(S.curva);
+  $('#curva-stat').innerHTML = TL.STATS.map(s => `<option value="${s.chave}"${s.chave === S.curva ? ' selected' : ''}>${esc(s.nome)}</option>`).join('');
+  const pts = TL.curva(S.b, st.chave, S.foco, S.t, S.o, 100);
+  const cur = TL.valor(S.b, st.chave);
+  const box = $('#curva-box');
+  const ys = pts.map(p => p.y);
+  if (Math.max(...ys) - Math.min(...ys) < 0.005) {
+    box.innerHTML = `<p class="note">${esc(st.nome)} não afeta o foco “${TL.FOCOS[S.foco].nome}”. Troque o foco acima.</p>`;
+    $('#curva-info').innerHTML = ''; $('#curva-tab').innerHTML = ''; return;
+  }
+  const [lo, hi] = st.faixa;
+  let y0 = Math.min(...ys, 100), y1 = Math.max(...ys, 100);
+  const pad = (y1 - y0) * 0.06; y0 -= pad; y1 += pad;
+  const X = x => M.l + (x - lo) / (hi - lo) * (W - M.l - M.r);
+  const Y = y => H - M.b - (y - y0) / (y1 - y0) * (H - M.t - M.b);
+  const nice = (a, b, n) => { const r = (b - a) / n, p = Math.pow(10, Math.floor(Math.log10(r))), f = r / p, s = (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * p; const o = []; for (let v = Math.ceil(a / s) * s; v <= b + 1e-9; v += s) o.push(v); return o; };
+  const xt = nice(lo, hi, 6), yt = nice(y0, y1, 5);
+  let bands = '';
+  for (let i = 0; i < pts.length - 1; i++) {
+    const z = zona(pts[i].marg);
+    bands += `<rect x="${X(pts[i].x).toFixed(1)}" y="${M.t}" width="${(X(pts[i + 1].x) - X(pts[i].x)).toFixed(2)}" height="${H - M.t - M.b}" shape-rendering="crispEdges" class="band z-${z.k}"/>`;
+  }
+  const path = pts.map((p, i) => (i ? 'L' : 'M') + X(p.x).toFixed(1) + ' ' + Y(p.y).toFixed(1)).join('');
+  const parada = pts.find(p => p.x > lo && zona(p.marg).k === 'crit');
+  const cy = TL.foco(TL.indices(S.b, S.b, S.t, S.o), S.foco);
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Curva de retorno de ${esc(st.nome)} para ${esc(TL.FOCOS[S.foco].nome)}">
+    ${bands}
+    ${yt.map(v => `<line x1="${M.l}" x2="${W - M.r}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" class="grid"/><text x="${M.l - 8}" y="${(Y(v) + 4).toFixed(1)}" text-anchor="end" class="tick">${fmt(v, v % 1 ? 1 : 0)}%</text>`).join('')}
+    ${xt.map(v => `<text x="${X(v).toFixed(1)}" y="${H - M.b + 18}" text-anchor="middle" class="tick">${fmt(v)}</text>`).join('')}
+    <line x1="${M.l}" x2="${W - M.r}" y1="${H - M.b}" y2="${H - M.b}" class="axis"/>
+    <line x1="${M.l}" x2="${W - M.r}" y1="${Y(100).toFixed(1)}" y2="${Y(100).toFixed(1)}" class="ref"/>
+    <path d="${path}" class="line"/>
+    ${parada ? `<line x1="${X(parada.x).toFixed(1)}" x2="${X(parada.x).toFixed(1)}" y1="${M.t}" y2="${H - M.b}" class="stop"/><text x="${X(parada.x).toFixed(1)}" y="${M.t + 12}" text-anchor="${X(parada.x) > W - 140 ? 'end' : 'start'}" dx="${X(parada.x) > W - 140 ? -6 : 6}" class="lbl">ponto de parada ≈ ${fmt(parada.x)}</text>` : ''}
+    <circle cx="${X(cur).toFixed(1)}" cy="${Y(cy).toFixed(1)}" r="5.5" class="you"/>
+    <text x="${X(cur).toFixed(1)}" y="${(Y(cy) + 20).toFixed(1)}" text-anchor="middle" class="lbl">você</text>
+    <line id="xh" y1="${M.t}" y2="${H - M.b}" class="xh" hidden/>
+    <rect x="${M.l}" y="${M.t}" width="${W - M.l - M.r}" height="${H - M.t - M.b}" fill="transparent" id="hit"/>
+  </svg><div id="tip" class="tip" hidden></div>`;
+  const svg = $('svg', box), tip = $('#tip'), xh = $('#xh');
+  const move = e => {
+    const r = svg.getBoundingClientRect(), px = (e.clientX - r.left) / r.width * W;
+    const x = lo + (px - M.l) / (W - M.l - M.r) * (hi - lo);
+    const p = pts.reduce((a, b) => Math.abs(b.x - x) < Math.abs(a.x - x) ? b : a);
+    xh.removeAttribute('hidden'); xh.setAttribute('x1', X(p.x)); xh.setAttribute('x2', X(p.x));
+    const z = zona(p.marg);
+    tip.hidden = false;
+    tip.innerHTML = `<b>${fmt(p.x, p.x % 1 ? 1 : 0)}</b> ${esc(st.nome)}<br>Índice ${fmt(p.y, 1)}% da build atual<br>${st.rotulo}: ${sgn(p.marg)} ${chip(z)}`;
+    const tx = X(p.x) / W * r.width;
+    tip.style.left = Math.min(Math.max(tx + 12, 4), r.width - 190) + 'px'; tip.style.top = '8px';
+  };
+  const sai = () => { tip.hidden = true; xh.setAttribute('hidden', ''); };
+  $('#hit', box).addEventListener('pointermove', move); $('#hit', box).addEventListener('pointerleave', sai);
+
+  const g = TL.ganho(S.b, st.chave, st.passo, S.foco, S.t, S.o), z = zona(g);
+  let txt = `Agora você está em <strong>${fmt(cur, cur % 1 ? 1 : 0)}</strong>: ${st.rotulo} rende ${sgn(g)} (${z.rot.toLowerCase()}).`;
+  if (parada) txt += cur >= parada.x ? ` Você já passou do ponto de parada (≈ ${fmt(parada.x)}).` : ` O retorno cai abaixo de 0,5% por passo perto de ${fmt(parada.x)}.`;
+  if (st.chave === 'recarga') txt += ' A Recarga tem teto de 120%.';
+  $('#curva-info').innerHTML = `<p class="lead">${txt}</p>
+    <p class="note"><span class="chip z-good"><span aria-hidden="true">✓</span>rende bem</span> <span class="chip z-warn"><span aria-hidden="true">▲</span>caro</span> <span class="chip z-crit"><span aria-hidden="true">●</span>quase não rende</span> Faixas coloridas no fundo = zona do retorno de ${st.rotulo}.</p>`;
+  const amostra = pts.filter((_, i) => i % 10 === 0);
+  $('#curva-tab').innerHTML = `<details><summary>Ver valores</summary><div class="scroll"><table class="rank"><thead><tr><th>${esc(st.nome)}</th><th>Índice (atual = 100%)</th><th>${st.rotulo}</th></tr></thead><tbody>${amostra.map(p => `<tr><td class="num">${fmt(p.x, p.x % 1 ? 1 : 0)}</td><td class="num">${fmt(p.y, 1)}%</td><td class="num">${sgn(p.marg)}</td></tr>`).join('')}</tbody></table></div></details>`;
+}
+
+/* ---------- E se? ---------- */
+function aplicaTudo() {
+  let b = { ...S.b };
+  for (const w of S.whatif) b = TL.aplicar(b, w.chave, Number(w.delta) || 0);
+  return b;
+}
+function renderWhatif() {
+  const opts = c => TL.STATS.map(s => `<option value="${s.chave}"${s.chave === c ? ' selected' : ''}>${esc(s.nome)}</option>`).join('');
+  $('#wf-rows').innerHTML = S.whatif.map((w, i) => `<div class="wf-row">
+    <select data-i="${i}" data-f="chave" aria-label="Stat ${i + 1}">${opts(w.chave)}</select>
+    <input type="number" step="any" value="${w.delta}" data-i="${i}" data-f="delta" aria-label="Mudança ${i + 1}">
+    <span class="unit">${w.chave === 'dano_base' ? '%' : 'pontos'}</span>
+    <button type="button" class="ghost" data-rm="${i}" aria-label="Remover linha ${i + 1}">Remover</button></div>`).join('');
+  const nb = aplicaTudo(), ind = TL.indices(nb, S.b, S.t, S.o), gf = TL.foco(ind, S.foco) - 100;
+  const linhas = [['Dano', ind.dano], ['Cura direta', ind.cura], ['Cura contínua', ind.hot], ['Sobrevivência', ind.sobrev]];
+  let v, vk;
+  if (S.whatif.length === 0) { v = 'Adicione uma mudança para comparar.'; vk = 'zero'; }
+  else if (gf >= 1) { v = `Vale a pena para ${TL.FOCOS[S.foco].nome.toLowerCase()}: ${sgn(gf)} no total.`; vk = 'good'; }
+  else if (gf <= -1) { v = `Não vale para ${TL.FOCOS[S.foco].nome.toLowerCase()}: ${sgn(gf)} no total.`; vk = 'crit'; }
+  else { v = `Praticamente neutro para ${TL.FOCOS[S.foco].nome.toLowerCase()} (${sgn(gf)}). Decida pelo custo e pelo conforto de jogo.`; vk = 'warn'; }
+  const ic = { good: '✓', warn: '▲', crit: '✕', zero: '–' }[vk];
+  const pior = linhas.filter(l => l[1] - 100 <= -1).map(l => l[0].toLowerCase());
+  $('#wf-out').innerHTML = `<p class="verdict v-${vk}"><span aria-hidden="true">${ic}</span> ${v}</p>
+    <div class="scroll"><table class="rank"><thead><tr><th>Índice</th><th>Antes</th><th>Depois</th><th>Variação</th></tr></thead><tbody>
+    ${linhas.map(l => `<tr><th scope="row">${l[0]}</th><td class="num">100%</td><td class="num">${fmt(l[1], 1)}%</td><td class="num ${Math.abs(l[1] - 100) < 0.05 ? '' : (l[1] > 100 ? 'up' : 'dn')}">${Math.abs(l[1] - 100) < 0.05 ? '—' : sgn(l[1] - 100)}</td></tr>`).join('')}
+    </tbody></table></div>
+    ${pior.length && vk !== 'crit' ? `<p class="note">Atenção: essa mudança piora ${pior.join(' e ')} em 1% ou mais, mesmo com o foco ${vk === 'good' ? 'ganhando' : 'estável'}.</p>` : ''}`;
+}
+
+/* ---------- Ficha ---------- */
+const CAMPOS = [
+  ['Ofensivo', [['dano_min', 'Dano Base mínimo'], ['dano_max', 'Dano Base máximo'], ['crit', 'Chance de acerto crítico (rating)'], ['crit_chefe', 'Crítico contra Chefes (aba Chefes)'], ['pesado', 'Chance de ataque pesado (rating)'], ['pesado_chefe', 'Pesado contra Chefes (aba Chefes)'], ['acerto', 'Chance de acerto (rating)'], ['dc', 'Dano Crítico (%)'], ['dap', 'Dano de Ataque Pesado (%)'], ['dap_extra', 'DAP extra de set (buff condicional, %)'], ['amp', 'Ampliação de Dano de Habilidade'], ['amp_magico', 'Ampliação de Dano Mágico (%)'], ['bonus', 'Bônus de Dano'], ['recarga', 'Velocidade de Recarga (%)'], ['vel_ataque', 'Velocidade de Ataque (%)']]],
+  ['Cura', [['cura', 'Cura (%)'], ['cura_cont', 'Cura Contínua de Habilidade (%)'], ['cura_rec', 'Cura Recebida (%)'], ['esc_div', 'Eficácia de cura da maestria (%)']]],
+  ['Defesa', [['def_corpo', 'Defesa corpo a corpo'], ['def_mag', 'Defesa mágica'], ['resist', 'Resistência a Dano de Habilidade'], ['reducao', 'Redução de Dano (%)'], ['vida', 'Vida máxima']]],
+];
+function renderFicha() {
+  $('#ficha-form').innerHTML = CAMPOS.map(([g, cs]) => `<fieldset><legend>${g}</legend>${cs.map(([k, n]) => `<label for="f-${k}"><span>${n}</span><input id="f-${k}" type="number" step="any" value="${S.b[k]}" data-k="${k}"></label>`).join('')}</fieldset>`).join('');
+}
+
+/* ---------- Alvo e premissas ---------- */
+function renderAlvo() {
+  $('#alvo-tipo').value = S.t.tipo;
+  $('#alvo-tol').value = S.t.tol; $('#alvo-tol-n').value = S.t.tol; $('#alvo-esq').value = S.t.esq;
+  $('#bosses').innerHTML = BOSSES.map(([n, v]) => `<button type="button" class="pill${S.t.tol === v ? ' on' : ''}" data-tol="${v}">${n} ${v}</button>`).join('');
+  $('#alvo-tol').disabled = $('#alvo-tol-n').disabled = S.t.tipo === 'boneco';
+  const [pc, ph] = TL.chances(S.b, S.t);
+  $('#alvo-res').innerHTML = `Crítico <b>${fmt(pc * 100, 1)}%</b> · Pesado <b>${fmt(ph * 100, 1)}%</b> neste alvo`;
+  $('#parte_skill').value = S.o.parte_skill * 100; $('#parte_skill-n').textContent = fmt(S.o.parte_skill * 100) + '%';
+  $('#parte_recarga').value = S.o.parte_recarga * 100; $('#parte_recarga-n').textContent = fmt(S.o.parte_recarga * 100) + '%';
+}
+
+function renderTudo() {
+  renderAlvo();
+  if (S.tab === 'onde') renderOnde();
+  if (S.tab === 'curva') renderCurva();
+  if (S.tab === 'whatif') renderWhatif();
+}
+
+function setTab(t) {
+  S.tab = t;
+  $$('[role=tab]').forEach(b => { const on = b.dataset.tab === t; b.setAttribute('aria-selected', on); b.tabIndex = on ? 0 : -1; });
+  $$('.panel').forEach(p => p.hidden = p.id !== 'p-' + t);
+  renderTudo();
+}
+
+function aplicarJson(txt) {
+  const msg = $('#json-msg');
+  try {
+    const j = JSON.parse(txt), b = j.build || j, t = j.alvo;
+    let n = 0;
+    for (const k in S.b) if (typeof b[k] === 'number') { S.b[k] = b[k]; n++; }
+    if (t) for (const k in S.t) if (k in t) S.t[k] = t[k];
+    msg.textContent = n ? `${n} campos carregados.` : 'Nenhum campo reconhecido no JSON.';
+    renderFicha(); renderTudo();
+  } catch (e) { msg.textContent = 'JSON inválido: confira vírgulas e aspas.'; }
+}
+
+function init() {
+  $('#foco').innerHTML = Object.entries(TL.FOCOS).map(([k, f]) => `<option value="${k}">${f.nome}</option>`).join('');
+  $('#foco').addEventListener('change', e => { S.foco = e.target.value; renderTudo(); });
+  $('#alvo-tipo').addEventListener('change', e => { S.t.tipo = e.target.value; if (e.target.value === 'boneco') { S.t.tol = 0; S.t.esq = 0; } renderTudo(); });
+  const tol = v => { S.t.tol = Math.max(0, Number(v) || 0); renderTudo(); };
+  $('#alvo-tol').addEventListener('input', e => tol(e.target.value));
+  $('#alvo-tol-n').addEventListener('input', e => tol(e.target.value));
+  $('#alvo-esq').addEventListener('input', e => { S.t.esq = Math.max(0, Number(e.target.value) || 0); renderTudo(); });
+  $('#bosses').addEventListener('click', e => { const b = e.target.closest('[data-tol]'); if (b) tol(b.dataset.tol); });
+  for (const k of ['parte_skill', 'parte_recarga']) $('#' + k).addEventListener('input', e => { S.o[k] = e.target.value / 100; renderTudo(); });
+  $$('[role=tab]').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
+  $('#curva-stat').addEventListener('change', e => { S.curva = e.target.value; renderCurva(); });
+  $('#ficha-form').addEventListener('input', e => { const k = e.target.dataset.k; if (k) { S.b[k] = Number(e.target.value) || 0; renderTudo(); } });
+  $('#wf-rows').addEventListener('input', e => { const i = e.target.dataset.i; if (i === undefined) return; S.whatif[i][e.target.dataset.f] = e.target.dataset.f === 'delta' ? e.target.value : e.target.value; renderWhatif(); });
+  $('#wf-rows').addEventListener('click', e => { const r = e.target.closest('[data-rm]'); if (r) { S.whatif.splice(Number(r.dataset.rm), 1); renderWhatif(); } });
+  $('#wf-add').addEventListener('click', () => { if (S.whatif.length < 6) { S.whatif.push({ chave: 'amp', delta: 100 }); renderWhatif(); } });
+  $('#json-apply').addEventListener('click', () => aplicarJson($('#json').value));
+  $('#json-exemplo').addEventListener('click', () => { Object.assign(S.b, TL.BUILD); Object.assign(S.t, TL.ALVO); renderFicha(); renderTudo(); $('#json-msg').textContent = 'Exemplo carregado.'; });
+  $('#json-copy').addEventListener('click', () => {
+    const txt = JSON.stringify({ build: S.b, alvo: S.t }, null, 1); $('#json').value = txt;
+    (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => $('#json-msg').textContent = 'Ficha copiada.', () => { $('#json').select(); $('#json-msg').textContent = 'Selecionei o texto: copie com Ctrl+C.'; });
+  });
+  renderFicha(); setTab('onde');
+}
+init();
+
+</script>
