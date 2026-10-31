@@ -107,7 +107,7 @@ function pInicio() {
       <p class="note"><button class="btn sm" data-act="goto" data-p="whatif">Testar uma troca</button></p></div>
   </div>
   ${alertas.length ? `<div class="card" style="margin-top:16px"><h2>Alertas</h2><div class="stack">${alertas.slice(0, 5).map(a => `<p style="margin:0">▲ ${a}</p>`).join('')}</div></div>` : ''}
-  <p class="note">Aproximação por engenharia reversa (outubro de 2026). Serve para comparar caminhos, não garante o número exato do jogo.</p>`;
+  <p class="note">Estimativas por modelagem matemática (outubro de 2026). Servem para comparar caminhos e podem diferir dos valores reais do jogo.</p>`;
 }
 
 /* ---------- Otimizar ---------- */
@@ -309,6 +309,9 @@ function pSobre() {
   <tr><td>Defesa</td><td>K ÷ (K + Defesa): 2.500 físico, 860 mágico; Resistência de habilidade K 900; Redução é percentual direto.</td><td class="z-warn"><b>Média</b></td></tr>
   <tr><td>Tolerância do chefe</td><td>130 a 1.500 entre os chefes medidos (masmorra, raid e archboss); padrão 300. Esquiva de pesado perto de 0.</td><td class="z-warn"><b>Média</b></td></tr>
   <tr><td>PvP</td><td>Não medido. Este app só descreve PvE.</td><td class="z-crit"><b>Sem dado</b></td></tr></tbody></table></div>
+  <div class="card" style="margin-top:16px"><h2>Sobre o projeto</h2>
+    <p class="sub" style="margin-bottom:8px">Simulador independente de builds, feito por modelagem matemática e análise empírica de mecânicas observadas no jogo. Os resultados são estimativas e podem diferir dos valores reais.</p>
+    <p class="note" style="margin-top:0">Gratuito, sem fins lucrativos e <b>não afiliado</b> à Amazon Games, à NCSOFT ou a qualquer publicadora de Throne and Liberty. Nomes e marcas pertencem aos seus donos. O app não acessa o jogo: não lê a memória nem o tráfego, não modifica arquivos e não automatiza nada. Ele só trabalha com os números que você digita, cola ou envia em print da sua própria ficha, no seu aparelho.</p></div>
   <p class="note">O dano é calculado para uma skill de referência (475% do Dano Base + 232, como o Raio em Cadeia) e para o ataque básico, misturados pela parte de skills que você definir. Uma rotação real tem skills diferentes: trate o resultado como direção, não como DPS exato.</p></div>
   <div class="card" style="margin-top:16px"><h2>Aparência e instalação</h2><div class="row"><div class="seg" role="group" aria-label="Tema">${[['auto', 'Automático'], ['dark', 'Escuro'], ['light', 'Claro']].map(([k, n]) => `<button aria-pressed="${D.data.tema === k}" data-act="tema" data-k="${k}">${n}</button>`).join('')}</div></div>
   <p class="note">No Chrome ou Edge: menu do navegador, “Instalar app”. No celular: “Adicionar à tela inicial”. Funciona sem internet depois da primeira abertura (precisa ser aberto por um endereço http, não pelo arquivo direto). Suas builds ficam só neste aparelho.</p></div>`;

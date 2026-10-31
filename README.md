@@ -1,7 +1,15 @@
-# Otimizador de Build (Throne and Liberty)
+# Muu-chan Builds TL
 
-App de PC e celular (PWA) que mostra onde cada ponto de stat rende mais, onde o retorno já caiu, e o efeito de trocar um stat por outro.
-É uma aproximação por engenharia reversa (outubro de 2026), não garante o número exato do jogo. Só PvE.
+Simulador independente de builds de Throne and Liberty, desenvolvido por meio de modelagem matemática e análise empírica de mecânicas observadas no jogo. Os resultados são estimativas (outubro de 2026) e podem diferir dos valores reais.
+
+App de PC e celular (PWA) que mostra onde cada ponto de stat rende mais, onde o retorno já caiu, e o efeito de trocar um stat por outro. Só PvE.
+
+## Aviso
+
+- Projeto gratuito, sem fins lucrativos e **não afiliado** à Amazon Games, à NCSOFT ou a qualquer publicadora do jogo. Nomes e marcas pertencem aos seus donos.
+- O app **não acessa o jogo**: não lê memória nem tráfego de rede, não altera arquivos, não injeta nada e não automatiza ações. Só usa números que a própria pessoa digita, cola (JSON) ou envia em print da sua ficha.
+- A leitura de print roda no próprio aparelho. As builds ficam salvas só no aparelho, e o app não envia dados para servidor nenhum (as únicas conexões externas são para baixar a fonte do Google Fonts e o leitor de texto, este só na primeira leitura de print).
+- Use por sua conta e risco; verifique os termos de serviço do jogo se tiver dúvida.
 
 ## Como abrir
 

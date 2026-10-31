@@ -1,4 +1,4 @@
-"""Motor de formulas de Throne and Liberty (aproximado, engenharia reversa).
+"""Motor de formulas de Throne and Liberty (estimativa por modelagem matemática).
 
 Referencia em Python; a pagina do otimizador usa a mesma logica em JavaScript (engine.js).
 Tudo aqui e aproximado e nao garantido: ver os comentarios de cada formula.

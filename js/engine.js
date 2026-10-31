@@ -1,4 +1,4 @@
-// Motor de formulas de Throne and Liberty (aproximado, engenharia reversa). Espelho de engine.py.
+// Motor de formulas de Throne and Liberty (estimativa por modelagem matemática). Espelho de engine.py.
 const TL = (() => {
   const K_CHANCE = 1000, K_AMP = 1000, K_AMP_CURA = 3060, K_DEF_FIS = 2500, K_DEF_MAG = 860, K_RES = 900, V_TETO = 120, AS_TETO = 150;
 
