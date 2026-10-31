@@ -216,7 +216,7 @@ function pBuilds() {
     return `<div class="bcard${x.id === d.active ? ' on' : ''}">${x.exemplo ? '<span class="tag">Exemplo</span>' : ''}${x.id === d.active ? '<span class="tag">Ativa</span>' : ''}
     <input type="text" value="${esc(x.nome)}" data-nome="${x.id}" aria-label="Nome da build">
     <div class="muted num" style="font-size:13px">Dano ${fmt(b.dano_min)}–${fmt(b.dano_max)} · Crít ${fmt(pc * 100)}% · Pesado ${fmt(ph * 100)}% · Amp ${fmt(b.amp)}</div>
-    <div class="row"><button class="btn sm main" data-act="usar" data-id="${x.id}">Usar</button><button class="btn sm" data-act="editar" data-id="${x.id}">Editar ficha</button><button class="btn sm" data-act="dup" data-id="${x.id}">Duplicar</button>${b0.length > 1 ? `<button class="btn sm danger" data-act="del" data-id="${x.id}">Excluir</button>` : ''}</div></div>`; };
+    <div class="row"><button class="btn sm main" data-act="usar" data-id="${x.id}">Usar</button><button class="btn sm" data-act="editar" data-id="${x.id}">Editar ficha</button><button class="btn sm" data-act="dup" data-id="${x.id}">Duplicar</button><button class="btn sm" data-act="exportar" data-id="${x.id}" title="Copia o JSON da build para colar em outro lugar">Exportar JSON</button><button class="btn sm" data-act="baixar" data-id="${x.id}" title="Baixa o arquivo .json">⬇ .json</button>${b0.length > 1 ? `<button class="btn sm danger" data-act="del" data-id="${x.id}">Excluir</button>` : ''}</div></div>`; };
   return `${topo('Builds', 'Salve várias fichas e compare.')}
   <div class="grid g2">${b0.map(card).join('')}</div>
   <div class="row" style="margin-top:12px"><button class="btn main" data-act="criar" data-m="print">＋ Criar minha build</button><button class="btn" data-act="nova">Cópia da build ativa</button></div>
@@ -239,6 +239,15 @@ function cmpHtml() {
 const CAMPOS = [['Ofensivo', [['dano_min', 'Dano Base mínimo'], ['dano_max', 'Dano Base máximo'], ['crit', 'Chance de acerto crítico (rating)'], ['crit_chefe', 'Crítico contra Chefes (aba Chefes)'], ['pesado', 'Chance de ataque pesado (rating)'], ['pesado_chefe', 'Pesado contra Chefes (aba Chefes)'], ['acerto', 'Chance de acerto (rating)'], ['dc', 'Dano Crítico (%)'], ['dap', 'Dano de Ataque Pesado (%)'], ['dap_extra', 'DAP extra de set (buff condicional, %)'], ['amp', 'Ampliação de Dano de Habilidade'], ['amp_magico', 'Ampliação de Dano Mágico (%)'], ['bonus', 'Bônus de Dano'], ['recarga', 'Velocidade de Recarga (%)'], ['vel_ataque', 'Velocidade de Ataque (%)']]],
   ['Cura', [['cura', 'Cura (%)'], ['cura_cont', 'Cura Contínua de Habilidade (%)'], ['cura_rec', 'Cura Recebida (%)'], ['esc_div', 'Eficácia de cura da maestria (%)']]],
   ['Defesa', [['def_corpo', 'Defesa corpo a corpo'], ['def_mag', 'Defesa mágica'], ['resist', 'Resistência a Dano de Habilidade'], ['reducao', 'Redução de Dano (%)'], ['vida', 'Vida máxima']]]];
+/* Exportar: o mesmo JSON serve para colar em "Colar JSON" (nova build) ou em Ficha > Aplicar JSON */
+const jsonDe = x => JSON.stringify({ app: 'Muu-chan Builds TL', nome: x.nome, build: norm(x.b) }, null, 1);
+function baixar(x) {
+  try {
+    const a = document.createElement('a'), u = URL.createObjectURL(new Blob([jsonDe(x)], { type: 'application/json' }));
+    a.href = u; a.download = (x.nome.replace(/[^\p{L}\p{N}_-]+/gu, '-').replace(/^-+|-+$/g, '') || 'build') + '.json'; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 1000);
+    toast('Arquivo .json baixado');
+  } catch (e) { toast('Não consegui baixar o arquivo'); }
+}
 const camposHtml = b => CAMPOS.map(([g, cs]) => `<fieldset><legend>${g}</legend><div class="frm">${cs.map(([k, n]) => `<label class="field"><span>${n}</span><input type="number" step="any" value="${b[k]}" data-k="${k}"></label>`).join('')}</div></fieldset>`).join('');
 const printHtml = () => `<p class="sub">Mande prints da ficha (Efeitos Básicos, Ataque e Proteção, aba Chefes). O app lê os números e você confere antes de aplicar. Na primeira vez ele baixa o leitor, então precisa de internet.</p>
   <label class="drop" id="drop" for="ocrfile"><input type="file" id="ocrfile" accept="image/*" multiple hidden><b>Escolher prints</b> ou arrastar aqui<small>Também dá para colar com Ctrl+V</small></label><div id="ocrout">${ocrHtml()}</div>`;
@@ -256,7 +265,7 @@ function pNova() {
     : m === 'digitar' ? `<p class="sub">Use os números da tela de status do jogo. Os campos que você não mexer ficam com o valor do exemplo.</p>${camposHtml(b)}`
     : `<p class="sub">Cole o JSON da ficha (o Claude devolve nesse formato ao ler o print, ou use "Copiar ficha atual" em outra build).</p>
       <textarea id="json" rows="7" spellcheck="false" placeholder='{"build": {"crit": 2726, "pesado": 1617.8, "dc": 22.1}}'></textarea>
-      <div class="row" style="margin-top:10px"><button class="btn main" data-act="jsonapply">Carregar JSON</button></div>`;
+      <div class="row" style="margin-top:10px"><button class="btn main" data-act="jsonapply">Carregar JSON</button><label class="btn" for="jsonfile">Escolher arquivo .json<input type="file" id="jsonfile" accept=".json,application/json" hidden></label></div>`;
   return `${topo('Nova build', 'Escolha UM jeito de preencher, confira e confirme no final.')}
   <div class="card"><label class="field"><span>1. Nome da build</span><input type="text" id="nome" value="${esc(c.nome)}"></label></div>
   <div class="card" style="margin-top:16px"><h2>2. Como você quer preencher?</h2>
@@ -347,7 +356,8 @@ async function ocrArquivos(files) {
 }
 document.addEventListener('change', e => {
   const t = e.target;
-  if (t.id === 'ocrfile' && t.files.length) { ocrArquivos([...t.files]); t.value = ''; }
+  if (t.id === 'jsonfile' && t.files.length) { t.files[0].text().then(s => { $('#json').value = s; document.querySelector('[data-act=jsonapply]').click(); }); t.value = ''; }
+  else if (t.id === 'ocrfile' && t.files.length) { ocrArquivos([...t.files]); t.value = ''; }
   else if (t.dataset.oc !== undefined) { ui.ocr.itens[t.dataset.oc].on = t.checked; ocrRender(); }
   else if (t.dataset.ov !== undefined) { ui.ocr.itens[t.dataset.ov].v = Number(t.value) || 0; }
 });
@@ -407,8 +417,10 @@ document.addEventListener('click', e => {
     case 'wfrm': d.whatif.splice(Number(a.dataset.i), 1); D.save(); refresh(); break;
     case 'preset': d.whatif = PRESETS[Number(a.dataset.i)][1].map(([chave, delta]) => ({ chave, delta })); D.save(); refresh(); break;
     case 'exemplo': cur().b = { ...TL.BUILD }; cur().exemplo = true; D.save(); toast('Exemplo carregado'); refresh(); break;
-    case 'jsoncopy': { const txt = JSON.stringify({ build: B() }, null, 1); $('#json').value = txt; (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => toast('Ficha copiada'), () => { $('#json').select(); toast('Selecionei o texto: copie com Ctrl+C'); }); break; }
-    case 'jsonapply': try { const j = JSON.parse($('#json').value), b = j.build || j; let n = 0; const ks = []; for (const k in TL.BUILD) if (typeof b[k] === 'number') { cur().b[k] = b[k]; n++; ks.push(k); } if (cur().rascunho) marcar(cur(), ks); else cur().exemplo = false; D.save(); toast(n ? `${n} campos carregados` : 'Nenhum campo reconhecido'); refresh(); } catch (err) { toast('JSON inválido'); } break;
+    case 'jsoncopy': { const txt = jsonDe(cur()); $('#json').value = txt; (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => toast('Ficha copiada'), () => { $('#json').select(); toast('Selecionei o texto: copie com Ctrl+C'); }); break; }
+    case 'exportar': { const x = d.builds.find(v => v.id === id), txt = jsonDe(x); (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => toast('JSON copiado. É só colar para quem for receber.'), () => baixar(x)); break; }
+    case 'baixar': baixar(d.builds.find(v => v.id === id)); break;
+    case 'jsonapply': try { const j = JSON.parse($('#json').value), b = j.build || j; let n = 0; const ks = []; for (const k in TL.BUILD) if (typeof b[k] === 'number') { cur().b[k] = b[k]; n++; ks.push(k); } if (cur().rascunho) { marcar(cur(), ks); if (typeof j.nome === 'string' && j.nome.trim() && cur().nome === 'Minha build') cur().nome = j.nome.trim().slice(0, 60); } else cur().exemplo = false; D.save(); toast(n ? `${n} campos carregados` : 'Nenhum campo reconhecido'); refresh(); } catch (err) { toast('JSON inválido'); } break;
   }
 });
 document.addEventListener('input', e => {

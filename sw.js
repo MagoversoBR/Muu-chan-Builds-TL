@@ -1,5 +1,5 @@
 // Service worker: guarda os arquivos do app para abrir offline. Aumente VERSAO ao publicar uma atualizacao.
-const VERSAO = 'tl-otimizador-v7';
+const VERSAO = 'tl-otimizador-v8';
 const ARQUIVOS = ['./', './img/muu-chan.webp','./index.html', './css/app.css', './js/engine.js', './js/app.js', './js/ocr.js', './manifest.webmanifest', './icons/favicon-64.png','./icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSAO).then(c => c.addAll(ARQUIVOS)).then(() => self.skipWaiting())); });
